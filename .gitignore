@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: 0BSD
+# SPDX-FileCopyrightText: 2020-2021 Nils Johannsen <n.johannsen@beckhoff.com>
+
+# Temporaries
+*.tmp
+*.bak
+*.bk?
+*.lnk
+*.orig
+*.log
+
+# Archives
+*.zip
+*.img
+*.vdi
+*.txz
+
+# Binaries
+[Dd]ebug/
+[Rr]elease/
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+x64/
+x86/
+*.a
+*.o
+*.so
+*.ko
+*.dll
+*.exe
+*.bin
+*.obj
+*.pch
+
+# Debug
+*.dbg
+*.pdb
+*.core
+
+# VS
+.vs/
+ipch/
+*.suo
+*.user
+*.vspscc
+*.vssscc
+*.~*
+
+# TwinCAT
+_Boot/
+_Libraries/
+_CompileInfo/
+_Deployment/
+_ModuleInstall/
+_Repository/
+_products/
+*.tszip
+*.tnzip
+*.tpzip
+*.tpy
+*.tclrs
+*.library
+*.compiled-library
+*.compileinfo
+*.tmcRefac
+*.tsproj.bk?
+*.xti.bk?
+
+# TwinCAT HMI
+.engineering_servers/

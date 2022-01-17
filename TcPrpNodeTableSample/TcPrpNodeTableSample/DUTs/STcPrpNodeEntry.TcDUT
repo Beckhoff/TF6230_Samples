@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="STcPrpNodeEntry" Id="{a68352b2-7d91-0eae-3b54-9241f2ac2266}">
+    <Declaration><![CDATA[TYPE STcPrpNodeEntry : 
+STRUCT
+	(* MAC Address of the remote source node. *)
+	{attribute 'GUID' := 'CC07E0A0-FC03-45CD-BFD9-D46B7C731E7B'}
+	MacAddress : MAC_ADDRESS;
+	(* True if the node is probably a SAN on port A. *)
+	bSanA : BOOL;
+	(* True if the node is probably a SAN on port B. *)
+	bSanB : BOOL;
+	(* Number of frames received from that node on port A. *)
+	CntReceivedA : UDINT;
+	(* Number of frames received from that node on port B. *)
+	CntReceivedB : UDINT;
+	(* Number of frames received from that node with wrong LAN identifier on port A. *)
+	CntErrWrongLanA : UDINT;
+	(* Number of frames received from that node with wrong LAN identifier on port B. *)
+	CntErrWrongLanB : UDINT;
+	(* Discarded dublicated frames count fron node on port A. *)
+	CntDuplicateDiscardLanA : UDINT;
+	(* Discarded dublicated frames count fron node on port B. *)
+	CntDuplicateDiscardLanB : UDINT;
+	(* Supervision frames count from node on port A. *)
+	CntSupervisionFrameLanA : UDINT;
+	(* Supervision frames count from node on port B. *)
+	CntSupervisionFrameLanB : UDINT;
+	(* Receive error count from node on port A. *)
+	CntRxErrLanA : UDINT;
+	(* Receive error count from node on port B. *)
+	CntRxErrLanB : UDINT;
+	(* Transmit error count from node on port A. *)
+	CntTxErrLanA : UDINT;
+	(* Transmit error count from node on port B. *)
+	CntTxErrLanB : UDINT;
+	(* Time at which the latest frame was received from that node over port A. *)
+	TimeLastSeenA : UDINT;
+	(* Time at which the latest frame was received from that node over port B. *)
+	TimeLastSeenB : UDINT;
+END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.9">
+  <POU Name="MAIN" Id="{b1761923-727b-4068-9cd4-bf7120baa2de}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM MAIN
+VAR
+	fbAdapter : FB_TcPrpAdapter(VAR_OIDs.PRP);
+	fbNode : FB_TcPrpNode(MAC);
+END_VAR
+VAR CONSTANT
+	MAC : MAC_ADDRESS := ( b := [16#00, 16#01, 16#05, 16#62, 16#42, 16#F5] );
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[fbNode(fbAdapter:= fbAdapter);
+fbNode.bTimeoutA; 
+fbNode.bTimeoutB; 
+fbNode.bDisconnect; 
+fbNode.bDisconnected;]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

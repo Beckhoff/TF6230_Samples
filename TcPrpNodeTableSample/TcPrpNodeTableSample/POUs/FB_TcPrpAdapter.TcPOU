@@ -1,0 +1,200 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.9">
+  <POU Name="FB_TcPrpAdapter" Id="{e2f86950-d311-4a95-96f6-c6d360c4d90c}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK PUBLIC FB_TcPrpAdapter
+VAR_OUTPUT
+	bLinkA : BOOL;
+	bLinkB : BOOL;
+END_VAR
+VAR
+	_bValid : BOOL;
+	_hResult : HRESULT;
+	_nObjectID : OTCID;
+	_ipObject : ITComObject;
+	_mLinkStatus : STcPrpLinkStatus;
+	_nNodeCount : UDINT;
+	_arrNodeTable : ARRAY[1.._nNodeTableSize] OF STcPrpNodeEntry;
+	_fbAdsRead : ADSREAD;
+END_VAR
+VAR CONSTANT
+	_nNodeTableSize : UDINT := 64;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="FB_exit" Id="{f3b5e644-4b50-4f01-bccb-31315201043e}">
+      <Declaration><![CDATA[METHOD FB_exit : BOOL
+VAR_INPUT
+	bInCopyCode : BOOL; // if TRUE, the exit method is called for exiting an instance that is copied afterwards (online change).
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bInCopyCode THEN RETURN; END_IF
+
+_bValid := FALSE;
+
+FW_SafeRelease(ADR(_ipObject));]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_init" Id="{d61e9592-8a5c-4599-8e1e-8e011206dea6}">
+      <Declaration><![CDATA[METHOD FB_init : BOOL
+VAR_INPUT
+	bInitRetains : BOOL; // if TRUE, the retain variables are initialized (warm start / cold start)
+	bInCopyCode : BOOL;  // if TRUE, the instance afterwards gets moved into the copy code (online change)
+	
+	OID : OTCID; // ObjectID of the PRP Adapter
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bInCopyCode THEN RETURN; END_IF
+
+_nObjectID := OID;
+
+_hResult := FW_ObjMgr_GetObjectInstance(
+	oid:= _nObjectID,
+	iid:= TC_GLOBAL_IID_LIST.IID_ITComObject,
+	pipUnk:= ADR(_ipObject));
+
+_bValid := SUCCEEDED(_hResult);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GetLinkStatus" Id="{ef7a27dc-e0e0-442a-802f-10d781320863}">
+      <Declaration><![CDATA[METHOD PUBLIC GetLinkStatus : BOOL]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[GetLinkStatus := GetObjPara(16#03150005, SIZEOF(_mLinkStatus), ADR(_mLinkStatus));
+
+IF NOT GetLinkStatus THEN
+	_mLinkStatus.bLinkA := FALSE;
+	_mLinkStatus.bLinkB := FALSE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GetNodeCount" Id="{a4dcbf4c-188c-4036-8c9f-e3b28458f89a}">
+      <Declaration><![CDATA[METHOD PUBLIC GetNodeCount : UDINT]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF GetObjPara(16#0315000A, SIZEOF(_nNodeCount), ADR(_nNodeCount)) THEN
+	GetNodeCount := _nNodeCount;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GetNodeEntry" Id="{1b56cfc9-f5f1-47e3-a229-487ce75f7eb8}">
+      <Declaration><![CDATA[METHOD PUBLIC GetNodeEntry : BOOL
+VAR_INPUT
+	nIndex : UDINT;
+END_VAR
+VAR_IN_OUT
+	mEntry : STcPrpNodeEntry;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF _nNodeCount = 0 THEN
+	GetNodeCount();
+END_IF
+IF _nNodeCount >= _nNodeTableSize THEN
+	_nNodeCount := _nNodeTableSize;
+END_IF
+
+IF nIndex >= 1 AND nIndex <= _nNodeCount THEN
+	mEntry := _arrNodeTable[nIndex];
+	GetNodeEntry := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GetNodeIndexByMac" Id="{9f802061-ccf8-456d-99cd-1c574f665805}">
+      <Declaration><![CDATA[METHOD PUBLIC GetNodeIndexByMac : UDINT
+VAR_INPUT
+	mMacAddress : MAC_ADDRESS;
+END_VAR
+VAR
+	_nIndex : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF _nNodeCount = 0 THEN
+	GetNodeCount();
+END_IF
+IF _nNodeCount >= _nNodeTableSize THEN
+	_nNodeCount := _nNodeTableSize;
+END_IF
+
+FOR _nIndex := 1 TO _nNodeCount DO
+	IF MEMCMP(ADR(_arrNodeTable[_nIndex].MacAddress), ADR(mMacAddress), SIZEOF(mMacAddress)) = 0 THEN
+		GetNodeIndexByMac := _nIndex;
+		RETURN;
+	END_IF
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GetNodeTable" Id="{b17b545e-70cb-46e0-a9ff-af56574d4244}">
+      <Declaration><![CDATA[METHOD PUBLIC GetNodeTable : BOOL]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _fbAdsRead.BUSY THEN
+	_fbAdsRead(READ := FALSE);
+END_IF
+
+_fbAdsRead(
+	READ:= TRUE,
+	PORT:= 10,
+	IDXGRP:= _nObjectID,
+	IDXOFFS:= 16#03150004,
+	LEN:= SIZEOF(_arrNodeTable), 
+	DESTADDR:= ADR(_arrNodeTable));
+
+IF _fbAdsRead.ERR THEN
+	_hResult := UDINT_TO_DINT(16#98110000 + _fbAdsRead.ERRID);
+END_IF
+
+GetNodeTable := NOT (_fbAdsRead.BUSY OR _fbAdsRead.ERR);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GetObjPara" Id="{20314aec-9ac1-4b24-bae2-27f2069e6c93}">
+      <Declaration><![CDATA[METHOD INTERNAL GetObjPara : BOOL
+VAR_INPUT
+	nPID : PTCID;
+	nData : UDINT;
+	pData : PVOID;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _bValid THEN RETURN; END_IF
+
+_hResult := _ipObject.TcGetObjPara(nPID, nData, pData, 0);
+
+GetObjPara := SUCCEEDED(_hResult);]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="IsValid" Id="{034ce256-d486-4ce5-8667-f86064be77ff}">
+      <Declaration><![CDATA[PROPERTY PUBLIC IsValid : BOOL]]></Declaration>
+      <Get Name="Get" Id="{3b49f23c-1296-439e-bc89-225460aa2b98}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IsValid := _bValid;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="LinkStatusA" Id="{bce23ffc-367d-41f1-bf46-42dba58f7929}">
+      <Declaration><![CDATA[PROPERTY PUBLIC LinkStatusA : BOOL]]></Declaration>
+      <Get Name="Get" Id="{78e86a16-a003-48e3-a40d-f34a84ca0f72}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[LinkStatusA := _mLinkStatus.bLinkA;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="LinkStatusB" Id="{e5caa720-e137-4555-a891-b87ea2260bfe}">
+      <Declaration><![CDATA[PROPERTY PUBLIC LinkStatusB : BOOL]]></Declaration>
+      <Get Name="Get" Id="{2ede1e42-b34b-4fca-a4bb-cd6d85fbd8bd}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[LinkStatusB := _mLinkStatus.bLinkB;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Result" Id="{92276da0-c6c3-4a5d-9547-b736db3ce74f}">
+      <Declaration><![CDATA[PROPERTY Result : HRESULT]]></Declaration>
+      <Get Name="Get" Id="{f5ddf4a3-0549-45ea-9489-358541c87139}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Result := _hResult;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+  </POU>
+</TcPlcObject>

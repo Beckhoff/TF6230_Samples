@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: 0BSD
+# SPDX-FileCopyrightText: 2020-2021 Nils Johannsen <n.johannsen@beckhoff.com>
+
+## TC3 XAE is Windows only
+* -crlf
+
+* text=auto
+*.h text eol=lf
+*.cpp text eol=lf
+*.sh text eol=lf
+*.md text eol=lf
+*.crt text eol=lf
+*.key text eol=lf
+*.txt text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.TcPOU text eol=crlf
+*.TcDUT text eol=crlf
+*.TcGVL text eol=crlf
+*.TcTTO text eol=crlf

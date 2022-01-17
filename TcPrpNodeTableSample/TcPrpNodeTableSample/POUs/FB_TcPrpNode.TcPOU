@@ -1,0 +1,169 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.9">
+  <POU Name="FB_TcPrpNode" Id="{83a2978f-2ec6-4d6a-b1d0-d3c6c3a50ede}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_TcPrpNode
+VAR_IN_OUT
+	fbAdapter : FB_TcPrpAdapter;
+END_VAR
+VAR_OUTPUT
+	bValid : BOOL;
+	bSan : BOOL; // singly attached node
+	bError : BOOL; // any error
+	bErrRx : BOOL; // receive errors
+	bErrTx : BOOL; // transmit errors
+	bErrWrongLan : BOOL; // node with wrong LAN identifier
+	bReceived : BOOL; // anything received
+	bReceivedA : BOOL; // anything received on adapter A
+	bReceivedB : BOOL; // anything received on adapter B
+	bTimeoutA : BOOL; // nothing received on adapter A over 2s
+	bTimeoutB : BOOL; // nothing received on adapter B over 2s
+	bDisconnect : BOOL; // nothing received over 5s
+	bDisconnected : BOOL; // nothing received over 5s once
+END_VAR
+VAR
+	_mMacAddress : MAC_ADDRESS;
+
+	_nNodeIndex : UDINT := 16#FFFFFFFF;
+	_nNodeCount : UDINT;
+	_nNodeCountLast : UDINT;
+	_mNodeEntry : STcPrpNodeEntry;
+	_mNodeLast : STcPrpNodeEntry;
+	
+	_bReceiveA : BOOL;
+	_bReceiveB : BOOL;
+	_bDiscardA :BOOL;
+	_bDiscardB : BOOL;
+	_bSupervisionA : BOOL;
+	_bSupervisionB : BOOL;
+	
+	_tTimeoutA : TON;
+	_tTimeoutB : TON;
+	_tDisconnect : TON;
+END_VAR
+VAR CONSTANT
+	ctTimeout : TIME := T#2S;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[bReceived := FALSE;
+bReceivedA := FALSE;
+bReceivedB := FALSE;
+
+IF fbAdapter.IsValid THEN
+	_nNodeCount := fbAdapter.GetNodeCount();
+	IF fbAdapter.GetNodeTable() THEN
+		// get node index if undefined or node count has changed
+		IF _nNodeIndex = 16#FFFFFFFF OR _nNodeCount <> _nNodeCountLast THEN
+			_nNodeIndex := fbAdapter.GetNodeIndexByMac(_mMacAddress);
+			_nNodeCountLast := _nNodeCount;
+		END_IF
+		// get node entry by index
+		bValid := fbAdapter.GetNodeEntry(_nNodeIndex, _mNodeEntry);
+		// get node index if  index has changed, inidcated if mac is not as expected			
+		IF MEMCMP(ADR(_mNodeEntry.MacAddress), ADR(_mMacAddress), SIZEOF(_mMacAddress)) <> 0 THEN
+			_nNodeIndex := fbAdapter.GetNodeIndexByMac(_mMacAddress);	
+			bValid := fbAdapter.GetNodeEntry(_nNodeIndex, _mNodeEntry);			
+		END_IF
+
+		IF bValid THEN
+			bSan := _mNodeEntry.bSanA OR _mNodeEntry.bSanB;
+			
+			CntError(bErrRx, _mNodeEntry.CntRxErrLanA, _mNodeLast.CntRxErrLanA);
+			CntError(bErrRx, _mNodeEntry.CntRxErrLanB, _mNodeLast.CntRxErrLanB);
+			
+			CntError(bErrTx, _mNodeEntry.CntTxErrLanA, _mNodeLast.CntTxErrLanA);
+			CntError(bErrTx, _mNodeEntry.CntTxErrLanB, _mNodeLast.CntTxErrLanB);
+	
+			CntError(bErrWrongLan, _mNodeEntry.CntErrWrongLanA, _mNodeLast.CntErrWrongLanA);
+			CntError(bErrWrongLan, _mNodeEntry.CntErrWrongLanB, _mNodeLast.CntErrWrongLanB);
+	
+			bError := bErrRx OR bErrTx OR bErrWrongLan;
+	
+			CntCheck(_bReceiveA, _mNodeEntry.CntReceivedA, _mNodeLast.CntReceivedA);
+			CntCheck(_bReceiveB, _mNodeEntry.CntReceivedB, _mNodeLast.CntReceivedB);
+	
+			CntCheck(_bDiscardA, _mNodeEntry.CntDuplicateDiscardLanA, _mNodeLast.CntDuplicateDiscardLanA);
+			CntCheck(_bDiscardB, _mNodeEntry.CntDuplicateDiscardLanB, _mNodeLast.CntDuplicateDiscardLanB);
+	
+			CntCheck(_bSupervisionA, _mNodeEntry.CntSupervisionFrameLanA, _mNodeLast.CntSupervisionFrameLanA);
+			CntCheck(_bSupervisionB, _mNodeEntry.CntSupervisionFrameLanB, _mNodeLast.CntSupervisionFrameLanB);
+	
+			bReceivedA := _bReceiveA OR _bDiscardA OR _bSupervisionA;
+			bReceivedB := _bReceiveB OR _bDiscardB OR _bSupervisionB;
+			bReceived := bReceivedA OR bReceivedB;
+		END_IF
+	END_IF
+END_IF
+
+_tTimeoutA(IN := NOT bReceivedA, PT := ctTimeout, Q => bTimeoutA);
+_tTimeoutB(IN := NOT bReceivedB, PT := ctTimeout, Q => bTimeoutB);
+_tDisconnect(IN := NOT bReceived, PT := T#5S, Q => bDisconnect);
+IF bDisconnect THEN bDisconnected := TRUE; END_IF]]></ST>
+    </Implementation>
+    <Method Name="CntCheck" Id="{476890b4-70a4-4471-ae9e-d1be6b43488a}">
+      <Declaration><![CDATA[METHOD PRIVATE CntCheck : BOOL
+VAR_IN_OUT
+	bChk : BOOL;
+	nCnt : UDINT;
+	nLst : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bChk := nCnt <> nLst;
+nLst := nCnt;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CntError" Id="{d7f247e9-61a7-4139-b044-45219dde4b11}">
+      <Declaration><![CDATA[METHOD PRIVATE CntError : BOOL
+VAR_IN_OUT
+	bErr : BOOL;
+	nCnt : UDINT;
+	nLst : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF nCnt <> nLst THEN
+	bErr := TRUE;
+	nLst := nCnt;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_Init" Id="{21fe28e2-5c57-4549-bea4-597f8fc71532}">
+      <Declaration><![CDATA[METHOD FB_Init : BOOL
+VAR_INPUT
+	bInitRetains : BOOL; // if TRUE, the retain variables are initialized (warm start / cold start)
+	bInCopyCode : BOOL;  // if TRUE, the instance afterwards gets moved into the copy code (online change)
+	
+	MacAddress : MAC_ADDRESS;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_mMacAddress := MacAddress;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="IsValid" Id="{e31c6936-b252-4f7f-bfa9-9d936399940f}">
+      <Declaration><![CDATA[PROPERTY PUBLIC IsValid : BOOL]]></Declaration>
+      <Get Name="Get" Id="{bc03645f-f5bd-4ece-b8fe-daf373dbe78c}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IsValid := bValid;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="Reset" Id="{d0c527d5-2aab-4fa9-bb9b-5896f6511c1b}">
+      <Declaration><![CDATA[METHOD Reset : BOOL]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_mNodeLast := _mNodeEntry;
+
+_tTimeoutA(IN := FALSE);
+_tTimeoutB(IN := FALSE);
+_tDisconnect(IN := FALSE);
+
+bErrRx := FALSE;
+bErrTx := FALSE;
+bErrWrongLan := FALSE;
+
+bTimeoutA := FALSE;
+bTimeoutB := FALSE;
+bDisconnect := FALSE;
+bDisconnected := FALSE;]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>
